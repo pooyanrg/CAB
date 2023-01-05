@@ -33,6 +33,7 @@ your_data_path
 |   |   |–– no_change_captions.json
 |   |   |–– splits.json
 |   |   |–– type_mapping.json
+```
 
 
 ## Pretrained Weight
