@@ -35,7 +35,7 @@ your_data_path
 |   |   |–– type_mapping.json
 
 
-# Pretrained Weight
+## Pretrained Weight
 
 ```sh
 cd ckpts
