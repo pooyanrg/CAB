@@ -3,6 +3,8 @@
 ## Requirement
 follow the requirements and setup instruction as in [**CLIP4IDC: CLIP for Image Difference Captioning**](https://github.com/sushizixin/CLIP4IDC)
 
+The env.yml file provided includes the conda env configuration for running the code.
+
 ## Data Preparing
 
 **For CLEVR-Change**
