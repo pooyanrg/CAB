@@ -1,0 +1,1 @@
+# No-Text-CLIP4IDC
