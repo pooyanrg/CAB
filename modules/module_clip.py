@@ -385,8 +385,8 @@ class VisualTransformer(nn.Module):
         ##### New attention head ####
         #############################
         #############################
-        x = self.ln_mid_one(x)
-        x = self.last_one_head_attention(x, video_frame)
+#         x = self.ln_mid_one(x)
+#         x = self.last_one_head_attention(x, video_frame)
         #############################
         #############################
         ##### New attention head ####
@@ -518,8 +518,9 @@ class CLIP(nn.Module):
         hidden = self.visual(image.type(self.dtype), video_frame=video_frame)
         hidden = self.visual.ln_post(hidden) @ self.visual.proj
 
-        x = torch.cat([hidden[:, 0, :].unsqueeze(1), hidden[:, 50, :].unsqueeze(1)], 1)
-        x = torch.mean(x, 1)
+#         x = torch.cat([hidden[:, 0, :].unsqueeze(1), hidden[:, 50, :].unsqueeze(1)], 1)
+#         x = torch.mean(x, 1)
+        x = torch.cat([hidden[:, 0, :].unsqueeze(1), hidden[:, 50, :].unsqueeze(1)], 2).squeeze()
         # x = hidden[:, 0, :]
 
         if return_hidden:
