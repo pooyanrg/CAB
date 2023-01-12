@@ -12,7 +12,7 @@ from modules.until_module import PreTrainedModel, AllGather, CrossEn
 from modules.module_cross import CrossModel, CrossConfig
 from modules.module_decoder import DecoderModel, DecoderConfig
 
-from modules.module_clip import CLIP, convert_weights, Transformer
+from modules.module_clip import CLIP, convert_weights
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 logger = logging.getLogger(__name__)
@@ -195,11 +195,29 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
             self.decoder = DecoderModel(decoder_config, bert_word_embeddings_weight, bert_position_embeddings_weight)
             self.decoder_loss_fct = CrossEntropyLoss(ignore_index=0)
 
+        #############################
+        #############################
+        ######  sim Loss new   ######
+        #############################
+        #############################
+
+        self.linear_layer_1 = nn.Linear(1024, 512)
+        self.linear_layer_2 = nn.Linear(512, 1)
+        self.BCEloss = nn.BCELoss()
+        self.activation_1 = nn.ReLU()
+        self.activation_2 = nn.Sigmoid()
+
+        #############################
+        #############################
+        ######  sim Loss new   ######
+        #############################
+        #############################
+
         self.loss_fct = CrossEn()
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids, attention_mask, bef_image, aft_image, image_mask=None,
+    def forward(self, input_ids, token_type_ids, attention_mask, bef_image, aft_image, target, image_mask=None,
                 input_caption_ids=None, decoder_mask=None, output_caption_ids=None):
         input_ids = input_ids.view(-1, input_ids.shape[-1])
         token_type_ids = token_type_ids.view(-1, token_type_ids.shape[-1])
@@ -214,19 +232,50 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
             input_caption_ids = input_caption_ids.view(-1, input_caption_ids.shape[-1])
             decoder_mask = decoder_mask.view(-1, decoder_mask.shape[-1])
 
-        sequence_emb, visual_emb, sequence_output, visual_output = self.get_sequence_visual_output(input_ids, token_type_ids, attention_mask,
-                                                                         image, image_mask, shaped=True, video_frame=pair)
+        #############################
+        #############################
+        ###### No Text Encoder ######
+        #############################
+        #############################
+
+        # sequence_emb, visual_emb, sequence_output, visual_output = self.get_sequence_visual_output(input_ids, token_type_ids, attention_mask,
+        #                                                                  image, image_mask, shaped=True, video_frame=pair)
+        visual_emb, visual_output = self.get_visual_output(image, image_mask, shaped=True, video_frame=pair)
+        #############################
+        #############################
+        ###### No Text Encoder ######
+        #############################
+        #############################
 
         if self.training:
             loss = 0.
 
             if self._stage_one is True and self._stage_two is False:
-                sim_matrix, *_tmp = self.get_similarity_logits(sequence_emb, visual_emb, attention_mask, image_mask,
-                                                        shaped=True)
-                sim_loss1 = self.loss_fct(sim_matrix)
-                sim_loss2 = self.loss_fct(sim_matrix.T)
-                sim_loss = (sim_loss1 + sim_loss2) / 2
-                loss += sim_loss
+
+                #############################
+                #############################
+                ###### New Sim Measure ######
+                #############################
+                #############################
+
+                # sim_matrix, *_tmp = self.get_similarity_logits(sequence_emb, visual_emb, attention_mask, image_mask,
+                #                                         shaped=True)
+                # sim_matrix, label, *_tmp = self.get_similarity_logits_visual(visual_emb, image_mask, 
+                #                                                                         target, shaped=True)
+                decision, label = self.predict_similarity(visual_emb, target)
+
+                loss += self.BCEloss(decision.float(), label.float())
+                #############################
+                #############################
+                ###### New Sim Measure ######
+                #############################
+                #############################
+
+
+                # sim_loss1 = self.loss_fct(sim_matrix, label)
+                # sim_loss2 = self.loss_fct(sim_matrix.T, label)
+                # sim_loss = (sim_loss1 + sim_loss2) / 2
+                # loss += sim_loss
 
             elif self._stage_one is False and self._stage_two is True:
                 image_mask = torch.ones(visual_output.shape[0], visual_output.shape[1], device=visual_output.device).long()
@@ -242,6 +291,23 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
             return loss
         else:
             return None
+
+    def predict_similarity(self, visual_output, label):
+        visual_output = visual_output.contiguous()
+        if self.training:
+            visual_output = allgather(visual_output, self.task_config)
+            label = allgather(label, self.task_config)
+            torch.distributed.barrier()
+            
+        visual_output = visual_output.squeeze(1)
+
+        hidden = self.linear_layer_1(visual_output)
+        hidden = self.activation_1(hidden)
+        
+        hidden = self.linear_layer_2(hidden)
+        output = self.activation_2(hidden)
+
+        return output.squeeze(1), label
 
     def get_sequence_output(self, input_ids, token_type_ids, attention_mask, shaped=False):
         if shaped is False:
@@ -355,7 +421,32 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
 
         logit_scale = self.clip.logit_scale.exp()
         retrieve_logits = logit_scale * torch.matmul(sequence_output, visual_output.t())
+        # retrieve_logits = torch.matmul(sequence_output, visual_output.t())
         return retrieve_logits
+
+    def _loose_similarity_visual(self, visual_output, visual_mask, target):
+        visual_output = visual_output.contiguous()
+        if self.training:
+            visual_output = allgather(visual_output, self.task_config)
+            visual_mask = allgather(visual_mask, self.task_config)
+            target = allgather(target, self.task_config)
+            torch.distributed.barrier()
+
+        visual_output = visual_output.squeeze(1)
+        label = target
+        length = int(visual_output.size()[1] / 2)
+
+        visual_emb_first  = torch.narrow(visual_output, dim=1, start=0, length=length)
+        visual_emb_second = torch.narrow(visual_output, dim=1, start=length, length=length)
+
+        visual_emb_first  = visual_emb_first / visual_emb_first.norm(dim=-1, keepdim=True)
+        visual_emb_second = visual_emb_second / visual_emb_second.norm(dim=-1, keepdim=True)
+
+        
+        logit_scale = self.clip.logit_scale.exp()
+        retrieve_logits = logit_scale * torch.matmul(visual_emb_first, visual_emb_second.t())
+        # retrieve_logits = torch.matmul(visual_emb_first, visual_emb_second.t())
+        return retrieve_logits, label
 
     def get_similarity_logits(self, sequence_output, visual_output, attention_mask, visual_mask, shaped=False):
         if shaped is False:
@@ -367,6 +458,15 @@ class CLIP4IDC(CLIP4IDCPreTrainedModel):
         retrieve_logits = self._loose_similarity(sequence_output, visual_output, attention_mask, visual_mask)
 
         return retrieve_logits, contrastive_direction
+
+    def get_similarity_logits_visual(self, visual_output, visual_mask, target, shaped=False):
+        if shaped is False:
+            visual_mask = visual_mask.view(-1, visual_mask.shape[-1])
+
+        contrastive_direction = ()
+        retrieve_logits, label = self._loose_similarity_visual(visual_output, visual_mask, target)
+
+        return retrieve_logits, label, contrastive_direction        
 
     def decoder_caption(self, visual_output, visual_mask, input_caption_ids, decoder_mask,
                         shaped=False, get_logits=False):
