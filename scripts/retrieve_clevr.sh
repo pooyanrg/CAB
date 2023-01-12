@@ -18,4 +18,4 @@ python -m torch.distributed.launch --nproc_per_node=2 main_task_retrieval.py \
 --freeze_layer_num 0 \
 --linear_patch 2d \
 --pretrained_clip_name ViT-B/32
---init_mode your_pretrained_model_path
+--init_model your_pretrained_model_path
