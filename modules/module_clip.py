@@ -302,6 +302,20 @@ class VisualTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
+        #############################
+        #############################
+        ##### New attention head ####
+        #############################
+        #############################
+        self.ln_mid_one = LayerNorm(width)
+        self.last_one_head_attention = Transformer(width, layers=1, heads=1)
+
+        #############################
+        #############################
+        ##### New attention head ####
+        #############################
+        #############################
+
         # For 3D
         assert linear_patch in ['2d', '3d']
         self.linear_patch = linear_patch
@@ -365,7 +379,19 @@ class VisualTransformer(nn.Module):
         # x = self.ln_post(x[:, 0, :])
         # if self.proj is not None:
         #     x = x @ self.proj
-        
+
+        #############################
+        #############################
+        ##### New attention head ####
+        #############################
+        #############################
+        x = self.ln_mid_one(x)
+        x = self.last_one_head_attention(x, video_frame)
+        #############################
+        #############################
+        ##### New attention head ####
+        #############################
+        #############################
         if visualize is True:
             return x, all_attn_weights
         return x

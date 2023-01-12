@@ -183,11 +183,9 @@ class CrossEn(nn.Module):
     def __init__(self,):
         super(CrossEn, self).__init__()
 
-    def forward(self, sim_matrix, label):
-        logsigmoid = nn.LogSigmoid()
-        # logpt = F.logsigmoid(sim_matrix, dim=-1)
-        logpt = logsigmoid(sim_matrix)
-        logpt = label * torch.diag(logpt)
+    def forward(self, sim_matrix):
+        logpt = F.log_softmax(sim_matrix, dim=-1)
+        logpt = torch.diag(logpt)
         nce_loss = -logpt
         sim_loss = nce_loss.mean()
         return sim_loss
