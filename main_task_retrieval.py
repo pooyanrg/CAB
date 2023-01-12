@@ -303,8 +303,8 @@ def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, 
             "inputs": batch,
             "epoch": epoch,
             "step": step,
-            "total_loss": total_loss,
-            "step_loss": loss})
+            "accumulative_training_loss": total_loss,
+            "training_loss": loss})
 
     total_loss = total_loss / len(train_dataloader)
     return total_loss, global_step
@@ -315,18 +315,25 @@ def _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels):
     #     input_mask, segment_ids, *_tmp = b1
     #     sequence_output = batch_sequence_output_list[idx1]
     each_row = []
+    each_loss = []
+    all_labels = []
     for idx2, b2 in enumerate(batch_list_v):
         pair_mask, *_tmp = b2
         visual_output = batch_visual_output_list[idx2]
         label = labels[idx2]
         # b1b2_logits, t, *_tmp = model.get_similarity_logits_visual(visual_output, pair_mask, label)
         ans, _ = model.predict_similarity(visual_output, label)
+        loss = model.BCEloss(ans.float(), torch.Tensor(label).float().cuda())
         # b1b2_logits = torch.diag(b1b2_logits).cpu().detach().numpy()
         # each_row.append(b1b2_logits.flatten())
         each_row.append(ans.cpu().detach().numpy().flatten())
+        each_loss.append(loss.cpu().detach().numpy().flatten())
+        all_labels.append(label)
     sim_matrix = np.concatenate(each_row, axis=-1)
+    each_loss = np.concatenate(each_loss, axis=-1)
+    all_labels = np.concatenate(all_labels, axis=-1)
     # sim_matrix.append(each_row)
-    return np.asarray(sim_matrix)
+    return np.asarray(sim_matrix), np.asarray(each_loss), all_labels
 
 def eval_epoch(args, model, test_dataloader, device, n_gpu):
 
@@ -431,7 +438,10 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
         #         sim_matrix += parallel_outputs[idx]
         #     sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
         # else:
-        sim_matrix = _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels)
+        sim_matrix, val_loss, all_val_labels = _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels)
+        output = [1.0 if float(i) > 0.5 else 0.0 for i in sim_matrix]
+        accu = np.count_nonzero(all_val_labels - output)
+        val_accu = (len(output) - accu)/len(output)
         # sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
 
     # if multi_sentence_:
@@ -457,10 +467,13 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
     #             format(vt_metrics['R1'], vt_metrics['R5'], vt_metrics['R10'], vt_metrics['MR'], vt_metrics['MeanR']))
 
     # R1 = tv_metrics['R1']
-    import json
-    out_file = open("/home/pooyan/IDL/similarity_output_test_set_linear_non.json", "w")
-    json.dump([str(i) for i in sim_matrix], out_file)
-    logger.info("Finished")
+    # import json
+    # out_file = open("/home/pooyan/IDL/similarity_output_test_set_linear_semantic_1e-5.json", "w")
+    # json.dump([str(i) for i in sim_matrix], out_file)
+    wandb.log({"validation_loss_mean": np.mean(val_loss),
+    "validation_loss_std":np.std(val_loss),
+    "validation_accuracy": val_accu})
+    logger.info("validation results stored on wandb")
     # return R1
     return 0
 
@@ -575,8 +588,8 @@ def main():
                 output_model_file = save_model(epoch, args, model, optimizer, tr_loss, type_name="")
 
                 ## Run on val dataset, this process is *TIME-consuming*.
-                # logger.info("Eval on val dataset")
-                # R1 = eval_epoch(args, model, val_dataloader, device, n_gpu)
+                logger.info("Eval on val dataset")
+                eval_epoch(args, model, val_dataloader, device, n_gpu)
 
                 # R1 = eval_epoch(args, model, test_dataloader, device, n_gpu)
                 # if best_score <= R1:
