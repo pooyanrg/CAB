@@ -546,7 +546,7 @@ def main():
     ## ####################################
     if args.do_train:
 
-        wandb.init(project="CLIP4IDC-vision-encoder-image-change-detection-with-linear", dir="/home/pooyan/IDL/final_linear_log/")
+        wandb.init(project="CLIP4IDC-vision-encoder-image-change-detection-with-linear", dir="/home/pooyan/IDL_reduced_head_size/final_linear_log/")
         wandb.config = {"learning_rate": args.lr, "epochs": args.epochs, "batch_size": args.batch_size}
 
         train_dataloader, train_length, train_sampler = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
