@@ -152,8 +152,14 @@ class CLEVR_DataLoader(Dataset):
         aft_image_path = os.path.join(self.sc_features_path, image_name.replace('default', 'semantic'))
         target = 1.0
 
-        if self.subset == 'train' or self.subset == 'val':
+        if self.subset == 'train':
             if random.random() < 0.5:
+                aft_image_path = os.path.join(self.nsc_features_path, image_name.replace('default', 'nonsemantic'))
+                target = 0.0
+
+        if self.subset == 'val' or self.subset == 'test':
+            random.seed(idx)
+            if  random.random() < 0.5:
                 aft_image_path = os.path.join(self.nsc_features_path, image_name.replace('default', 'nonsemantic'))
                 target = 0.0
 
