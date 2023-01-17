@@ -370,13 +370,13 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
         batch_sequence_output_list, batch_visual_output_list = [], []
         total_pair_num = 0
         labels = []
-
         # ----------------------------
         # 1. cache the features
         # ----------------------------
         for bid, batch in enumerate(test_dataloader):
             batch = tuple(t.to(device) for t in batch)
             input_ids, input_mask, segment_ids, bef_image, aft_image, image_mask, target = batch
+            
             image_pair = torch.cat([bef_image, aft_image], 1)
             labels.append(target.data.to("cpu").numpy())
             if multi_sentence_:
@@ -522,7 +522,7 @@ def main():
 
     test_dataloader, test_length = None, 0
     if DATALOADER_DICT[args.datatype]["test"] is not None:
-        test_dataloader, test_length = DATALOADER_DICT[args.datatype]["test"](args, tokenizer)
+        test_dataloader, test_length = DATALOADER_DICT[args.datatype]["test"](args, tokenizer, subset="test")
 
     if DATALOADER_DICT[args.datatype]["val"] is not None:
         val_dataloader, val_length = DATALOADER_DICT[args.datatype]["val"](args, tokenizer, subset="val")
@@ -546,7 +546,7 @@ def main():
     ## ####################################
     if args.do_train:
 
-        wandb.init(project="CLIP4IDC-vision-encoder-image-change-detection-with-linear", dir="/home/pooyan/IDL_reduced_head_size/final_linear_log/")
+        wandb.init(project="CLIP4IDC-vision-encoder-image-change-detection-with-linear", dir="/home/pooyan/IDL_2/final_linear_log/")
         wandb.config = {"learning_rate": args.lr, "epochs": args.epochs, "batch_size": args.batch_size}
 
         train_dataloader, train_length, train_sampler = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
@@ -600,6 +600,7 @@ def main():
     elif args.do_eval:
         if args.local_rank == 0:
             eval_epoch(args, model, test_dataloader, device, n_gpu)
+                
     
     # model.to_onnx()
     # wandb.save("model.onnx")
