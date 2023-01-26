@@ -54,14 +54,14 @@ class CLEVR_DataLoader(Dataset):
             if int(image_id_) not in image_ids:
                 continue
             # file_path_ = os.path.join(self.default_features_path, image_file)
-            image_dict[int(image_id_)] = image_id_
+            image_dict[len(image_dict)] = image_id_
         self.image_dict = image_dict
 
         self.sample_len = 0
         self.sentences_dict = {}
         self.cut_off_points = []
-        for image_id in image_ids:
-            image_id_name = "CLEVR_default_%s.png" % self.image_dict[image_id]
+        for k, image_id in self.image_dict.items():
+            image_id_name = "CLEVR_default_%s.png" % image_id
             assert image_id_name in change_captions
             for cap_txt in change_captions[image_id_name]:
                 self.sentences_dict[len(self.sentences_dict)] = (image_id, cap_txt)
@@ -169,3 +169,4 @@ class CLEVR_DataLoader(Dataset):
         aft_image = self._get_rawimage(aft_image_path)
         image_mask = np.ones(2, dtype=np.long)
         return pairs_text, pairs_mask, pairs_segment, bef_image, aft_image, image_mask, target
+
