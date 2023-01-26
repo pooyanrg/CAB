@@ -87,9 +87,9 @@ class CLEVR_DataLoader(Dataset):
             print("For {}, image number: {}".format(self.subset, self.image_num))
 
         print("Image number: {}".format(len(self.image_dict)))
-        print("Total Paire: {}".format(len(self.sentences_dict)))
+        print("Total Paire: {}".format(len(self.image_dict)))
 
-        self.sample_len = len(self.sentences_dict)
+        self.sample_len = len(self.image_dict)
         self.rawImageExtractor = RawImageExtractor(size=image_resolution)
         self.SPECIAL_TOKEN = {"CLS_TOKEN": "<|startoftext|>", "SEP_TOKEN": "<|endoftext|>",
                               "MASK_TOKEN": "[MASK]", "UNK_TOKEN": "[UNK]", "PAD_TOKEN": "[PAD]"}
@@ -146,7 +146,7 @@ class CLEVR_DataLoader(Dataset):
         return image
 
     def __getitem__(self, idx):
-        image_id, caption = self.sentences_dict[idx]
+        image_id = self.image_dict[idx]
         image_name = "CLEVR_default_%s.png" % self.image_dict[image_id]
         bef_image_path = os.path.join(self.default_features_path, image_name)
         aft_image_path = os.path.join(self.sc_features_path, image_name.replace('default', 'semantic'))
