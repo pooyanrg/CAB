@@ -147,7 +147,8 @@ class CLEVR_DataLoader(Dataset):
 
     def __getitem__(self, idx):
         image_id = self.image_dict[idx]
-        image_name = "CLEVR_default_%s.png" % self.image_dict[image_id]
+        _, caption = self.sentences_dict[idx]
+        image_name = "CLEVR_default_%s.png" % image_id
         bef_image_path = os.path.join(self.default_features_path, image_name)
         aft_image_path = os.path.join(self.sc_features_path, image_name.replace('default', 'semantic'))
         target = 1.0
