@@ -225,11 +225,7 @@ def save_model(epoch, args, model, optimizer, tr_loss, type_name=""):
     optimizer_state_file = os.path.join(
         args.output_dir, "pytorch_opt.bin.{}{}".format("" if type_name=="" else type_name+".", epoch))
     torch.save(model_to_save.state_dict(), output_model_file)
-    # torch.save({
-    #         'epoch': epoch,
-    #         'optimizer_state_dict': optimizer.state_dict(),
-    #         'loss': tr_loss,
-    #         }, optimizer_state_file)
+
     logger.info("Model saved to %s", output_model_file)
     logger.info("Optimizer saved to %s", optimizer_state_file)
     return output_model_file
@@ -310,10 +306,6 @@ def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, 
     return total_loss, global_step
 
 def _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels):
-    # sim_matrix = []
-    # for idx1, b1 in enumerate(batch_list_t):
-    #     input_mask, segment_ids, *_tmp = b1
-    #     sequence_output = batch_sequence_output_list[idx1]
     each_row = []
     each_loss = []
     all_labels = []
@@ -321,18 +313,14 @@ def _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels):
         pair_mask, *_tmp = b2
         visual_output = batch_visual_output_list[idx2]
         label = labels[idx2]
-        # b1b2_logits, t, *_tmp = model.get_similarity_logits_visual(visual_output, pair_mask, label)
         ans, _ = model.predict_similarity(visual_output, label)
         loss = model.BCEloss(ans.float(), torch.Tensor(label).float().cuda())
-        # b1b2_logits = torch.diag(b1b2_logits).cpu().detach().numpy()
-        # each_row.append(b1b2_logits.flatten())
         each_row.append(ans.cpu().detach().numpy().flatten())
         each_loss.append(loss.cpu().detach().numpy().flatten())
         all_labels.append(label)
     sim_matrix = np.concatenate(each_row, axis=-1)
     each_loss = np.concatenate(each_loss, axis=-1)
     all_labels = np.concatenate(all_labels, axis=-1)
-    # sim_matrix.append(each_row)
     return np.asarray(sim_matrix), np.asarray(each_loss), all_labels
 
 def eval_epoch(args, model, test_dataloader, device, n_gpu):
@@ -355,13 +343,8 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
             and test_dataloader.dataset.multi_sentence_per_pair:
         multi_sentence_ = True
         cut_off_points_ = test_dataloader.dataset.cut_off_points
-    #     sentence_num_ = test_dataloader.dataset.sentence_num
-    #     pair_num_ = test_dataloader.dataset.image_num
         cut_off_points_ = [itm - 1 for itm in cut_off_points_]
 
-    # if multi_sentence_:
-    #     logger.warning("Eval under the multi-sentence per pair setting.")
-    #     logger.warning("sentence num: {}, pair num: {}".format(sentence_num_, pair_num_))
 
     model.eval()
     with torch.no_grad():
@@ -384,15 +367,6 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
                 b, *_t = image_pair.shape
                 b2, *_r = image_mask.shape
 
-                # sequence_output, _ = model.get_sequence_output(input_ids, segment_ids, input_mask)
-                # batch_sequence_output_list.append(sequence_output)
-                # batch_list_t.append((input_mask, segment_ids,))
-
-                # s_, e_ = total_pair_num, total_pair_num + b
-                # filter_inds = [itm - s_ for itm in cut_off_points_ if itm >= s_ and itm < e_]
-
-                # if len(filter_inds) > 0:
-                    # image_pair, pair_mask = image_pair[filter_inds, ...], image_mask[filter_inds, ...]
                 visual_output, _ = model.get_visual_output(image_pair, image_mask)
                 batch_visual_output_list.append(visual_output)
                 batch_list_v.append((image_mask,))
@@ -400,81 +374,17 @@ def eval_epoch(args, model, test_dataloader, device, n_gpu):
 
             print("{}/{}\r".format(bid, len(test_dataloader)), end="")
 
-        # ----------------------------------
-        # 2. calculate the similarity
-        # ----------------------------------
-        # if n_gpu > 1:
-        #     device_ids = list(range(n_gpu))
-        #     batch_list_t_splits = []
-        #     batch_list_v_splits = []
-        #     batch_t_output_splits = []
-        #     batch_v_output_splits = []
-        #     bacth_len = len(batch_list_t)
-        #     split_len = (bacth_len + n_gpu - 1) // n_gpu
-        #     for dev_id in device_ids:
-        #         s_, e_ = dev_id * split_len, (dev_id + 1) * split_len
-        #         if dev_id == 0:
-        #             # batch_list_t_splits.append(batch_list_t[s_:e_])
-        #             batch_list_v_splits.append(batch_list_v)
 
-        #             # batch_t_output_splits.append(batch_sequence_output_list[s_:e_])
-        #             batch_v_output_splits.append(batch_visual_output_list)
-        #         else:
-        #             devc = torch.device('cuda:{}'.format(str(dev_id)))
-        #             # devc_batch_list = [tuple(t.to(devc) for t in b) for b in batch_list_t[s_:e_]]
-        #             # batch_list_t_splits.append(devc_batch_list)
-        #             devc_batch_list = [tuple(t.to(devc) for t in b) for b in batch_list_v]
-        #             batch_list_v_splits.append(devc_batch_list)
-
-        #             # devc_batch_list = [b.to(devc) for b in batch_sequence_output_list[s_:e_]]
-        #             # batch_t_output_splits.append(devc_batch_list)
-        #             devc_batch_list = [b.to(devc) for b in batch_visual_output_list]
-        #             batch_v_output_splits.append(devc_batch_list)
-
-        #     parameters_tuple_list = [(batch_list_v_splits[dev_id], batch_v_output_splits[dev_id]) for dev_id in device_ids]
-        #     parallel_outputs = parallel_apply(_run_on_single_gpu, model, parameters_tuple_list, device_ids)
-        #     sim_matrix = []
-        #     for idx in range(len(parallel_outputs)):
-        #         sim_matrix += parallel_outputs[idx]
-        #     sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
-        # else:
         sim_matrix, val_loss, all_val_labels = _run_on_single_gpu(model, batch_list_v, batch_visual_output_list, labels)
         output = [1.0 if float(i) > 0.5 else 0.0 for i in sim_matrix]
         accu = np.count_nonzero(all_val_labels - output)
         val_accu = (len(output) - accu)/len(output)
-        # sim_matrix = np.concatenate(tuple(sim_matrix), axis=0)
 
-    # if multi_sentence_:
-    #     logger.info("before reshape, sim matrix size: {} x {}".format(sim_matrix.shape[0], sim_matrix.shape[1]))
-    #     cut_off_points2len_ = [itm + 1 for itm in cut_off_points_]
-    #     max_length = max([e_-s_ for s_, e_ in zip([0]+cut_off_points2len_[:-1], cut_off_points2len_)])
-    #     sim_matrix_new = []
-    #     for s_, e_ in zip([0] + cut_off_points2len_[:-1], cut_off_points2len_):
-    #         sim_matrix_new.append(np.concatenate((sim_matrix[s_:e_],
-    #                                               np.full((max_length-e_+s_, sim_matrix.shape[1]), -np.inf)), axis=0))
-    #     sim_matrix = np.stack(tuple(sim_matrix_new), axis=0)
-    #     logger.info("after reshape, sim matrix size: {} x {} x {}".
-    #                 format(sim_matrix.shape[0], sim_matrix.shape[1], sim_matrix.shape[2]))
-
-    #     tv_metrics = tensor_text_to_video_metrics(sim_matrix)
-    #     vt_metrics = compute_metrics(tensor_video_to_text_sim(sim_matrix))
-
-    # logger.info("Text-to-Image-Pair:")
-    # logger.info('\t>>>  R@1: {:.1f} - R@5: {:.1f} - R@10: {:.1f} - Median R: {:.1f} - Mean R: {:.1f}'.
-    #             format(tv_metrics['R1'], tv_metrics['R5'], tv_metrics['R10'], tv_metrics['MR'], tv_metrics['MeanR']))
-    # logger.info("Image-Pair-to-Text:")
-    # logger.info('\t>>>  V2T$R@1: {:.1f} - V2T$R@5: {:.1f} - V2T$R@10: {:.1f} - V2T$Median R: {:.1f} - V2T$Mean R: {:.1f}'.
-    #             format(vt_metrics['R1'], vt_metrics['R5'], vt_metrics['R10'], vt_metrics['MR'], vt_metrics['MeanR']))
-
-    # R1 = tv_metrics['R1']
-    # import json
-    # out_file = open("/home/pooyan/IDL/similarity_output_test_set_linear_semantic_1e-5.json", "w")
-    # json.dump([str(i) for i in sim_matrix], out_file)
     wandb.log({"validation_loss_mean": np.mean(val_loss),
     "validation_loss_std":np.std(val_loss),
     "validation_accuracy": val_accu})
     logger.info("validation results stored on wandb")
-    # return R1
+
     return 0
 
 def main():
@@ -591,19 +501,10 @@ def main():
                 logger.info("Eval on val dataset")
                 eval_epoch(args, model, val_dataloader, device, n_gpu)
 
-                # R1 = eval_epoch(args, model, test_dataloader, device, n_gpu)
-                # if best_score <= R1:
-                #     best_score = R1
-                #     best_output_model_file = output_model_file
-                # logger.info("The best model is: {}, the R1 is: {:.4f}".format(best_output_model_file, best_score))
-
     elif args.do_eval:
         if args.local_rank == 0:
             eval_epoch(args, model, test_dataloader, device, n_gpu)
                 
-    
-    # model.to_onnx()
-    # wandb.save("model.onnx")
 
 if __name__ == "__main__":
     main()
