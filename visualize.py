@@ -6,6 +6,7 @@ from PIL import Image
 import cv2
 from skimage import exposure
 import matplotlib.pyplot as plt
+import json
 
 from modules.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modules.modeling import CLIP4IDC
@@ -99,7 +100,7 @@ def visualize(visual_weights, bef_image_paths, aft_image_paths):
 
     ## Choose any weights you would like to see
     ## CLS Token of the first image
-    bef_weights, aft_weights = last_weights[0, 1:50], last_weights[0, 51:]
+    bef_weights, aft_weights = last_weights[50, 1:50], last_weights[0, 51:]
     ## CLS Token of the second image
     # bef_weights, aft_weights = last_weights[50, 1:50], last_weights[50, 51:]
 
@@ -112,47 +113,28 @@ def visualize(visual_weights, bef_image_paths, aft_image_paths):
     cam_aft_weights = exposure.rescale_intensity(aft_weights, out_range=(0, 255))
     cam_aft_weights = cv2.resize(cam_aft_weights.astype(np.uint8), (224, 224), interpolation=cv2.INTER_CUBIC)
 
-    sep_weights = visual_weights[8][0]
-    sep_bef_weights, sep_aft_weights = sep_weights[0, 0, 1:], sep_weights[1, 0, 1:]
-    sep_bef_weights = sep_bef_weights.data.cpu().numpy().reshape(7, 7)
-    sep_aft_weights = sep_aft_weights.data.cpu().numpy().reshape(7, 7)
-
-    cam_sep_bef_weights = exposure.rescale_intensity(sep_bef_weights, out_range=(0, 255))
-    cam_sep_bef_weights = cv2.resize(cam_sep_bef_weights.astype(np.uint8), (224, 224), interpolation=cv2.INTER_CUBIC)
-
-    cam_sep_aft_weights = exposure.rescale_intensity(sep_aft_weights, out_range=(0, 255))
-    cam_sep_aft_weights = cv2.resize(cam_sep_aft_weights.astype(np.uint8), (224, 224), interpolation=cv2.INTER_CUBIC)
-
     fig = plt.figure()
-    ax1 = fig.add_subplot(2, 3, 1)
-    ax2 = fig.add_subplot(2, 3, 2)
-    ax3 = fig.add_subplot(2, 3, 3)
-    ax4 = fig.add_subplot(2, 3, 4)
-    ax5 = fig.add_subplot(2, 3, 5)
-    ax6 = fig.add_subplot(2, 3, 6)
+    ax1 = fig.add_subplot(2, 2, 1)
+    ax2 = fig.add_subplot(2, 2, 2)
+    ax3 = fig.add_subplot(2, 2, 3)
+    ax4 = fig.add_subplot(2, 2, 4)
 
     ax1.imshow(bef_image)
     ax1.axis("off")
-    ax4.imshow(aft_image)
-    ax4.axis("off")
-
-    ax2.imshow(bef_image)
-    ax2.imshow(cam_sep_bef_weights, alpha=0.6, cmap="jet")
-    ax2.axis("off")
-
-    ax3.imshow(bef_image)
-    ax3.imshow(cam_bef_weights, alpha=0.6, cmap="jet")
+    ax3.imshow(aft_image)
     ax3.axis("off")
 
-    ax5.imshow(aft_image)
-    ax5.imshow(cam_sep_aft_weights, alpha=0.6, cmap="jet")
-    ax5.axis("off")
+    ax2.imshow(bef_image)
+    ax2.imshow(cam_bef_weights, alpha=0.6, cmap="jet")
+    ax2.axis("off")
 
-    ax6.imshow(aft_image)
-    ax6.imshow(cam_aft_weights, alpha=0.6, cmap="jet")
-    ax6.axis("off")
+    ax4.imshow(aft_image)
+    ax4.imshow(cam_aft_weights, alpha=0.6, cmap="jet")
+    ax4.axis("off")
 
     ## TODO Save Image
+    ## fig.savefig(path)
+    ## plt.close(fig)
     return
 
 
@@ -176,40 +158,45 @@ def visualize_epoch(args, model, test_dataloader, device):
     data_size = test_dataloader.dataset.sample_len
 
     ## Choose the index of the image pair
-    data_index = 0
-    batch = test_dataloader.dataset[data_index]
+    index_file = open("./vis_indexes.json")
+    indices = json.load(index_file)
+    
+    data_index = [int(i) for i in indices]
+    
+    for i in data_index:
+        batch = test_dataloader.dataset[i]
 
-    image_names = batch[-1]
+        image_names = batch[-1]
 
-    if args.datatype == "clevr":
-        bef_image, aft_image, nc_image = torch.from_numpy(batch[3]).to(device), torch.from_numpy(batch[4]).to(device), torch.from_numpy(batch[5]).to(device)
-        bef_image = bef_image.unsqueeze(1)
-        nc_image = nc_image.unsqueeze(1)
-        nc_video = torch.cat([bef_image, nc_image], 1)
-    else:
-        bef_image, aft_image = torch.from_numpy(batch[3]).to(device), torch.from_numpy(batch[4]).to(device)
-        bef_image = bef_image.unsqueeze(1)
-
-    aft_image = aft_image.unsqueeze(1)
-    video = torch.cat([bef_image, aft_image], 1)
-
-    if args.datatype == "clevr":
-        bef_image_paths = os.path.join(args.features_path, "images", "CLEVR_default_%s" % image_names)
-        aft_image_paths = os.path.join(args.features_path, "sc_images", "CLEVR_semantic_%s" % image_names)
-    elif args.datatype == "spot":
-        bef_image_paths = os.path.join(args.features_path, image_names)
-        aft_image_paths = os.path.join(args.features_path, image_names.replace(".png", "_2.png"))
-
-    with torch.no_grad():
-        video, video_frame = reshape_input(video)
-        _, attn_weights = model.clip.visual(video.type(model.clip.dtype), video_frame=video_frame, visualize=True)
-
-        visualize(attn_weights, bef_image_paths, aft_image_paths)
         if args.datatype == "clevr":
-            nc_video, nc_video_frame = reshape_input(nc_video)
-            _, nc_attn_weights = model.clip.visual(nc_video.type(model.clip.dtype), video_frame=nc_video_frame, visualize=True)
-            aft_image_paths = os.path.join(args.features_path, "nsc_images", "CLEVR_nonsemantic_%s" % image_names)
-            visualize(nc_attn_weights, bef_image_paths, aft_image_paths)
+            bef_image, aft_image, nc_image = torch.from_numpy(batch[3]).to(device), torch.from_numpy(batch[4]).to(device), torch.from_numpy(batch[5]).to(device)
+            bef_image = bef_image.unsqueeze(1)
+            nc_image = nc_image.unsqueeze(1)
+            nc_video = torch.cat([bef_image, nc_image], 1)
+        else:
+            bef_image, aft_image = torch.from_numpy(batch[3]).to(device), torch.from_numpy(batch[4]).to(device)
+            bef_image = bef_image.unsqueeze(1)
+
+        aft_image = aft_image.unsqueeze(1)
+        video = torch.cat([bef_image, aft_image], 1)
+
+        if args.datatype == "clevr":
+            bef_image_paths = os.path.join(args.features_path, "images", "CLEVR_default_%s" % image_names)
+            aft_image_paths = os.path.join(args.features_path, "sc_images", "CLEVR_semantic_%s" % image_names)
+        elif args.datatype == "spot":
+            bef_image_paths = os.path.join(args.features_path, image_names)
+            aft_image_paths = os.path.join(args.features_path, image_names.replace(".png", "_2.png"))
+
+        with torch.no_grad():
+            video, video_frame = reshape_input(video)
+            _, attn_weights = model.clip.visual(video.type(model.clip.dtype), video_frame=video_frame, visualize=True)
+
+            visualize(attn_weights, bef_image_paths, aft_image_paths)
+            if args.datatype == "clevr":
+                nc_video, nc_video_frame = reshape_input(nc_video)
+                _, nc_attn_weights = model.clip.visual(nc_video.type(model.clip.dtype), video_frame=nc_video_frame, visualize=True)
+                aft_image_paths = os.path.join(args.features_path, "nsc_images", "CLEVR_nonsemantic_%s" % image_names)
+                visualize(nc_attn_weights, bef_image_paths, aft_image_paths)
 
 
 if __name__ == '__main__':
