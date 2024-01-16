@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DATA_PATH=your_data/openImages-C/data
-python -m torch.distributed.launch --nproc_per_node=2 main_task_retrieval.py \
+python -m torch.distributed.launch --nproc_per_node=2 main.py \
 --do_train \
 --num_thread_reader=4 \
 --epochs=50 \
