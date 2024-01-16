@@ -1,4 +1,6 @@
-# Co-Attention Bottleneck: Explainable and Causal Attention Emerged from Transformers Trained to Detect Images Changes
+# CAB
+
+Official implementation of paper Co-Attention Bottleneck: Explainable and Causal Attention Emerged from Transformers Trained to Detect Images Changes
 
 ## Requirements
 
