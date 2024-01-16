@@ -46,23 +46,20 @@ your_data_path
 ```sh
 cd ckpts
 mkdir pretrained
-mkdir trained
 ```
 
-You can download the [Pretrained Weights](https://drive.google.com/drive/folders/1qOYVpZy57clJPF6AThsnO0Tfy4zq-gg1?usp=sharing) from the IDC Adaptation and the [Trained Weights](https://drive.google.com/drive/folders/18UfIvwKt0EE14EbogJycMmANpUJtsZbE?usp=sharing) from the IDC Finetuning. You would get
+You can download the [Pretrained Weights](https://drive.google.com/drive/folders/1qOYVpZy57clJPF6AThsnO0Tfy4zq-gg1?usp=sharing). We use weights from [CLIP4IDC](https://github.com/sushizixin/CLIP4IDC) to initials the vision encoder (backbone) in CAB.
 
 ```
 ckpts
 |–– pretrained/
 |   |–– pytorch_model.bin.clevr
 |   |–– pytorch_model.bin.spot
-|–– trained/
-|   |–– pytorch_model.bin.clevr
-|   |–– pytorch_model.bin.spot
 ```
 
-Download CLIP (ViT-B/32) weight,
+Download CLIP (ViT-B/32 and ViT-B/16) weight,
 ```sh
 wget -P ./modules https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt
+wget -P ./modules https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt
 ```
 
