@@ -9,7 +9,7 @@ python -m torch.distributed.launch --nproc_per_node=2 main_task_retrieval.py \
 --n_display=50 \
 --data_path ${DATA_PATH} \
 --features_path ${DATA_PATH} \
---output_dir ckpts/ckpt_clevr_caption_eval \
+--output_dir ckpts/ckpt_clevr \
 --lr 1e-4 \
 --max_words 32 \
 --batch_size_val 128 \
@@ -18,4 +18,4 @@ python -m torch.distributed.launch --nproc_per_node=2 main_task_retrieval.py \
 --freeze_layer_num 0 \
 --linear_patch 2d \
 --pretrained_clip_name ViT-B/32 \
---init_model ckpts/trained/pytorch_model.bin.clevr
+--init_model ckpts/pretrained/pytorch_model.bin.clevr
