@@ -261,7 +261,7 @@ def train_epoch(epoch, args, model, train_dataloader, device, n_gpu, optimizer, 
             batch = tuple(t.to(device=device, non_blocking=True) for t in batch)
 
         input_ids, input_mask, segment_ids, bef_image, aft_image, image_mask, target = batch
-        loss = model(input_ids, segment_ids, input_mask, bef_image, aft_image, target, image_mask)
+        loss = model(bef_image, aft_image, target, image_mask)
 
         if n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu.
