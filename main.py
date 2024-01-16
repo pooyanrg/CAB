@@ -8,7 +8,6 @@ import numpy as np
 import random
 import os
 import wandb
-from metrics import compute_metrics, tensor_text_to_video_metrics, tensor_video_to_text_sim
 import time
 import argparse
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
@@ -89,6 +88,7 @@ def get_args(description='CLIP4IDC on Retrieval Task'):
                         help="linear projection of flattened patches.")
 
     parser.add_argument("--pretrained_clip_name", default="ViT-B/32", type=str, help="Choose a CLIP version")
+    parser.add_argument('--lambda', type=float, default=.1, help='coefficient for detection loss.')
 
     args = parser.parse_args()
 
@@ -456,7 +456,7 @@ def main():
     ## ####################################
     if args.do_train:
 
-        wandb.init(project="CLIP4IDC-vision-encoder-image-change-detection-with-linear", dir="/home/pooyan/IDL_2/final_linear_log/")
+        wandb.init(project="CAB", dir=args.output_dir)
         wandb.config = {"learning_rate": args.lr, "epochs": args.epochs, "batch_size": args.batch_size}
 
         train_dataloader, train_length, train_sampler = DATALOADER_DICT[args.datatype]["train"](args, tokenizer)
