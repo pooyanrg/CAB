@@ -115,17 +115,6 @@ class CAB(CABPreTrainedModel):
         self.task_config = task_config
         self.ignore_video_index = -1
 
-        # assert self.task_config.max_words <= cross_config.max_position_embeddings
-
-        if task_config.task_type == "retrieval":
-            self._stage_one = True
-            self._stage_two = False
-        else:
-            self._stage_one = False
-            self._stage_two = True
-
-        show_log(task_config, "Stage-One:{}, Stage-Two:{}".format(self._stage_one, self._stage_two))
-
         # CLIP Encoders: From OpenAI: CLIP [https://github.com/openai/CLIP] ===>
         vit = "visual.proj" in clip_state_dict
         assert vit
@@ -189,12 +178,6 @@ class CAB(CABPreTrainedModel):
         convert_weights(self.clip)
         # <=== End of CLIP Encoders
 
-        if self._stage_one is False and self._stage_two is True:
-            decoder_config = update_attr("decoder_config", decoder_config, "num_decoder_layers",
-                                         self.task_config, "decoder_num_hidden_layers")
-            self.decoder = DecoderModel(decoder_config, bert_word_embeddings_weight, bert_position_embeddings_weight)
-            self.decoder_loss_fct = CrossEntropyLoss(ignore_index=0)
-
         self.linear_layer = nn.Linear(1024, 1)
         self.activation = nn.Sigmoid()
         self.BCEloss = nn.BCELoss()
@@ -202,31 +185,20 @@ class CAB(CABPreTrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, token_type_ids, attention_mask, bef_image, aft_image, target, image_mask=None,
-                input_caption_ids=None, decoder_mask=None, output_caption_ids=None):
-        input_ids = input_ids.view(-1, input_ids.shape[-1])
-        token_type_ids = token_type_ids.view(-1, token_type_ids.shape[-1])
-        attention_mask = attention_mask.view(-1, attention_mask.shape[-1])
+    def forward(self, bef_image, aft_image, target, image_mask=None):
+                    
         image_mask = image_mask.view(-1, image_mask.shape[-1])
-
         image = torch.cat([bef_image, aft_image], 1)
         b, pair, channel, h, w = image.shape
         image = image.view(b * pair, channel, h, w)
 
-        if input_caption_ids is not None:
-            input_caption_ids = input_caption_ids.view(-1, input_caption_ids.shape[-1])
-            decoder_mask = decoder_mask.view(-1, decoder_mask.shape[-1])
-
         visual_emb, visual_output = self.get_visual_output(image, image_mask, shaped=True, video_frame=pair)
 
         if self.training:
+            
             loss = 0.
-
-            if self._stage_one is True and self._stage_two is False:
-                
-                decision, label = self.predict_similarity(visual_emb, target)
-
-                loss += self.BCEloss(decision.float(), label.float())
+            decision, label = self.predict_similarity(visual_emb, target)
+            loss += self.BCEloss(decision.float(), label.float())
                 
             return loss
         else:
