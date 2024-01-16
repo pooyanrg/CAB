@@ -54,7 +54,6 @@ You can download the [Pretrained Weights](https://drive.google.com/drive/folders
 ckpts
 |–– pretrained/
 |   |–– pytorch_model.bin.clevr
-|   |–– pytorch_model.bin.spot
 ```
 
 Download CLIP (ViT-B/32 and ViT-B/16) weight,
