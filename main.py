@@ -12,7 +12,7 @@ import time
 import argparse
 from modules.tokenization_clip import SimpleTokenizer as ClipTokenizer
 from modules.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from modules.modeling import CLIP4IDC
+from modules.modeling import CAB
 from modules.optimization import BertAdam
 
 from util import get_logger
@@ -22,7 +22,7 @@ torch.distributed.init_process_group(backend="nccl")
 
 global logger
 
-def get_args(description='CLIP4IDC on Retrieval Task'):
+def get_args(description='CAB on Binary CD'):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--do_pretrain", action='store_true', help="Whether to run training.")
     parser.add_argument("--do_train", action='store_true', help="Whether to run training.")
@@ -157,7 +157,7 @@ def init_model(args, device, n_gpu, local_rank):
 
     # Prepare model
     cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-    model = CLIP4IDC.from_pretrained(args.cross_model, args.decoder_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
+    model = CAB.from_pretrained(args.cross_model, args.decoder_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
 
     model.to(device)
 
@@ -239,7 +239,7 @@ def load_model(epoch, args, n_gpu, device, model_file=None):
             logger.info("Model loaded from %s", model_file)
         # Prepare model
         cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed')
-        model = CLIP4IDC.from_pretrained(args.cross_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
+        model = CAB.from_pretrained(args.cross_model, cache_dir=cache_dir, state_dict=model_state_dict, task_config=args)
 
         model.to(device)
     else:
