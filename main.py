@@ -15,7 +15,7 @@ from modules.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modules.modeling import CLIP4IDC
 from modules.optimization import BertAdam
 
-from util import parallel_apply, get_logger
+from util import get_logger
 from dataloaders.data_dataloaders import DATALOADER_DICT
 
 torch.distributed.init_process_group(backend="nccl")
