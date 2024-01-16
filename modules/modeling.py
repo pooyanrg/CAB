@@ -6,12 +6,8 @@ import logging
 
 import torch
 from torch import nn
-from torch.nn import CrossEntropyLoss
 
-from modules.until_module import PreTrainedModel, AllGather, CrossEn
-from modules.module_cross import CrossModel, CrossConfig
-from modules.module_decoder import DecoderModel, DecoderConfig
-
+from modules.until_module import PreTrainedModel, AllGather
 from modules.module_clip import CLIP, convert_weights
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
@@ -22,15 +18,12 @@ class CABPreTrainedModel(PreTrainedModel, nn.Module):
     """ An abstract class to handle weights initialization and
         a simple interface for dowloading and loading pretrained models.
     """
-    def __init__(self, cross_config, decoder_config, *inputs, **kwargs):
-        super(CABPreTrainedModel, self).__init__(cross_config, decoder_config)
-        self.cross_config = cross_config
-        self.decoder_config = decoder_config
+    def __init__(self, *inputs, **kwargs):
+        super(CABPreTrainedModel, self).__init__()
         self.clip = None
-        self.cross = None
 
     @classmethod
-    def from_pretrained(cls, cross_model_name, decoder_model_name, state_dict=None, cache_dir=None, type_vocab_size=2, *inputs, **kwargs):
+    def from_pretrained(cls, state_dict=None, cache_dir=None, type_vocab_size=2, *inputs, **kwargs):
 
         task_config = None
         if "task_config" in kwargs.keys():
@@ -50,10 +43,7 @@ class CABPreTrainedModel(PreTrainedModel, nn.Module):
             if new_key not in state_dict:
                 state_dict[new_key] = val.clone()
 
-        cross_config, _ = CrossConfig.get_config(cross_model_name, cache_dir, type_vocab_size, state_dict=None, task_config=task_config)
-        decoder_config, _ = DecoderConfig.get_config(decoder_model_name, cache_dir, type_vocab_size, state_dict=None, task_config=task_config)
-
-        model = cls(cross_config, decoder_config, clip_state_dict, *inputs, **kwargs)
+        model = cls(clip_state_dict, *inputs, **kwargs)
 
         ## ===> Initialization trick [HARD CODE]
         if model.linear_patch == "3d":
@@ -110,8 +100,8 @@ def check_attr(target_name, task_config):
     return hasattr(task_config, target_name) and task_config.__dict__[target_name]
 
 class CAB(CABPreTrainedModel):
-    def __init__(self, cross_config, decoder_config, clip_state_dict, task_config):
-        super(CAB, self).__init__(cross_config, decoder_config)
+    def __init__(self, clip_state_dict, task_config):
+        super(CAB, self).__init__()
         self.task_config = task_config
         self.ignore_video_index = -1
 
