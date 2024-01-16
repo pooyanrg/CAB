@@ -1,9 +1,12 @@
-# No-Text-CLIP4IDC
+# Official implementation of Co-Attention Bottleneck: Explainable and Causal Attention Emerged from Transformers Trained to Detect Images Changes
 
-## Requirement
-follow the requirements and setup instruction as in [**CLIP4IDC: CLIP for Image Difference Captioning**](https://github.com/sushizixin/CLIP4IDC)
+## Requirements
 
-The env.yml file provided includes the conda env configuration for running the code.
+```sh
+conda env create -f env.yml
+conda activate cab
+```
+
 
 ## Data Preparing
 
