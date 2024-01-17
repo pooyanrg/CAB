@@ -265,6 +265,52 @@ class ResidualAttentionBlock(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return (x, video_frame, attn_weights)
 
+class CoAttentionModule(nn.Module):
+    def __init__(self, d_model: int, n_head: int, attn_mask=None):
+        super().__init__()
+
+        self.attn = nn.MultiheadAttention(d_model, n_head)
+        self.ln_1 = LayerNorm(d_model)
+        self.mlp = nn.Sequential(OrderedDict([
+            ("c_fc", nn.Linear(d_model, d_model * 4)),
+            ("gelu", QuickGELU()),
+            ("c_proj", nn.Linear(d_model * 4, d_model))
+        ]))
+        self.ln_2 = LayerNorm(d_model)
+        self.attn_mask = attn_mask
+
+    def attention(self, x: torch.Tensor, y: torch.Tensor):
+        attn_mask_ = self.attn_mask
+        if self.attn_mask is not None and hasattr(self.attn_mask, '__call__'):
+            attn_mask_ = self.attn_mask(x.size(0))   # LND
+
+        attn_mask_ = attn_mask_.to(dtype=x.dtype, device=x.device) if attn_mask_ is not None else None
+        return self.attn(x, y, y, need_weights=False, attn_mask=attn_mask_)[0]
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor):
+        x = x + self.attention(self.ln_1(x), self.ln_1(y))
+        x = x + self.mlp(self.ln_2(x))
+        return x
+    
+    def visualize_attention(self, x: torch.Tensor, y: torch.Tensor):
+        attn_outputs, attn_weights = self.attn(x, y, y, need_weights=True, attn_mask=None)
+        return attn_outputs, attn_weights
+    
+    def visualize_forward(self, x: torch.Tensor, y: torch.Tensor):
+        attn_outputs, attn_weights = self.visualize_attention(self.ln_1(x), self.ln_1(y))
+        x = x + attn_outputs
+        x = x + self.mlp(self.ln_2(x))
+        return (x, attn_weights)
+
+class coTransformer(nn.Module):
+    def __init__(self, width: int, layers: int, heads: int, attn_mask = None):
+        super().__init__()
+        self.width = width
+        self.layers = layers
+        self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) if i < (layers - 1) else CoAttentionModule(width, 1, attn_mask) for i in range(layers)])
+
+    def forward(self, x: torch.Tensor, video_frame=-1):
+        return self.resblocks((x, video_frame))[0]
 
 class Transformer(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, attn_mask = None):
@@ -297,7 +343,7 @@ class VisualTransformer(nn.Module):
         self.aft_embedding = nn.Parameter(scale * torch.randn(width))
         self.ln_mid = LayerNorm(width)
 
-        self.transformer = Transformer(width, layers, heads)
+        self.transformer = coTransformer(width, layers, heads)
 
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
@@ -353,18 +399,24 @@ class VisualTransformer(nn.Module):
         x = x.permute(1, 0, 2)  # NLD -> LND
         
         if visualize is True:
-            for i in range(self.intra_layers, self.transformer.layers):
+            for i in range(self.intra_layers, self.transformer.layers - 1):
                 x, _, attn_weights = self.transformer.resblocks[i].visualize_forward((x, video_frame))
                 all_attn_weights.append(attn_weights)
+            cls_index = int(x.size(0) / 2)
+            left_features, left_attn_weights = self.transformer.resblocks[-1].visualize_forward(x[:cls_index, :, :], x[cls_index:, :, :])
+            right_features, right_attn_weights = self.transformer.resblocks[-1].visualize_forward(x[cls_index:, :, :], x[:cls_index, :, :])
+            all_attn_weights.append(left_attn_weights)
+            all_attn_weights.append(right_attn_weights)
         else:
-            for i in range(self.intra_layers, self.transformer.layers):
+            for i in range(self.intra_layers, self.transformer.layers - 1):
                 x = self.transformer.resblocks[i]((x, video_frame))[0]
-        x = x.permute(1, 0, 2)  # LND -> NLD
-
-        # Move the three lines below to `encode_image` for entire hidden sequence
-        # x = self.ln_post(x[:, 0, :])
-        # if self.proj is not None:
-        #     x = x @ self.proj
+            cls_index = int(x.size(0) / 2)
+            left_features, left_attn_weights = self.transformer.resblocks[-1].visualize_forward(x[:cls_index, :, :], x[cls_index:, :, :])
+            right_features, right_attn_weights = self.transformer.resblocks[-1].visualize_forward(x[cls_index:, :, :], x[:cls_index, :, :])
+            
+        left_features = left_features.permute(1, 0, 2)  # LND -> NLD
+        right_features = right_features.permute(1, 0, 2)  # LND -> NLD
+        x = torch.cat([left_features, right_features], 1)
 
         if visualize is True:
             return x, all_attn_weights
