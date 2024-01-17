@@ -302,7 +302,7 @@ class CoAttentionModule(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return (x, attn_weights)
 
-class coTransformer(nn.Module):
+class CoTransformer(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, attn_mask = None):
         super().__init__()
         self.width = width
@@ -343,7 +343,7 @@ class VisualTransformer(nn.Module):
         self.aft_embedding = nn.Parameter(scale * torch.randn(width))
         self.ln_mid = LayerNorm(width)
 
-        self.transformer = coTransformer(width, layers, heads)
+        self.transformer = CoTransformer(width, layers, heads)
 
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
