@@ -48,7 +48,7 @@ cd ckpts
 mkdir pretrained
 ```
 
-You can download the [Pretrained Weights](https://drive.google.com/drive/folders/1qOYVpZy57clJPF6AThsnO0Tfy4zq-gg1?usp=sharing). We use weights from [CLIP4IDC](https://github.com/sushizixin/CLIP4IDC) to initials the vision encoder (backbone) in CAB.
+You can download the [Pretrained Weights](https://drive.google.com/drive/folders/1qOYVpZy57clJPF6AThsnO0Tfy4zq-gg1?usp=sharing). We use weights from [CLIP4IDC](https://github.com/sushizixin/CLIP4IDC) to initialize the vision encoder (backbone) in CAB.
 
 ```
 ckpts
