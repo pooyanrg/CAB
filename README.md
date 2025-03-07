@@ -1,7 +1,6 @@
-# CAB
+# TAB
 
-Official implementation of paper Co-Attention Bottleneck: Explainable and Causal Attention Emerged from Transformers Trained to Detect Images Changes
-
+Official implementation of ICCV 6610 submission
 ## Requirements
 
 ```sh
